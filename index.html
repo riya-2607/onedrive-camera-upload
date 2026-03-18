@@ -516,11 +516,13 @@ function getMsalLib() {
        : null;
 }
 
-function handleSaveConfig() {
+async function handleSaveConfig() {
   const id = document.getElementById('client-id-input').value.trim();
   if (!id || id.length < 10) { alert('Please enter a valid Azure App Client ID.'); return; }
   const lib = getMsalLib();
   if (!lib) { alert('Microsoft sign-in library has not loaded yet. Please check your internet connection and reload.'); return; }
+  const btn = document.querySelector('#section-setup .btn-primary');
+  btn.disabled = true; btn.textContent = 'Initializing…';
   try {
     msalInstance = new lib.PublicClientApplication({
       auth: {
@@ -530,11 +532,18 @@ function handleSaveConfig() {
       },
       cache: { cacheLocation: 'sessionStorage' }
     });
+    // MSAL v3 requires initialize() before any other API call
+    if (typeof msalInstance.initialize === 'function') {
+      await msalInstance.initialize();
+    }
     // Check for existing session
     const accounts = msalInstance.getAllAccounts();
     if (accounts.length > 0) { populateUser(accounts[0]); show('section-camera'); }
     else { show('section-auth'); }
-  } catch(e) { alert('Init error: ' + e.message); }
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Continue';
+    alert('Init error: ' + e.message);
+  }
 }
 
 // ── Auth ───────────────────────────────────────────────
