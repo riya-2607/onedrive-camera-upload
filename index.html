@@ -6,7 +6,31 @@
 <title>OneDrive Camera Upload</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library-for-js/2.38.0/msal-browser.min.js"></script>
+<script>
+// Try loading MSAL from multiple CDNs in order
+(function() {
+  function loadScript(src, onSuccess, onFail) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = onSuccess;
+    s.onerror = onFail;
+    document.head.appendChild(s);
+  }
+  var cdns = [
+    'https://unpkg.com/@azure/msal-browser@3.7.1/lib/msal-browser.min.js',
+    'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js'
+  ];
+  var idx = 0;
+  function tryNext() {
+    if (idx >= cdns.length) {
+      document.getElementById('msal-error').style.display = 'block';
+      return;
+    }
+    loadScript(cdns[idx++], function(){}, tryNext);
+  }
+  tryNext();
+})();
+</script>
 <style>
   :root {
     --ms-blue: #0078d4;
@@ -349,6 +373,10 @@
 </style>
 </head>
 <body>
+<div id="msal-error" style="display:none;background:#fde7e9;border:1px solid #f1a1a8;border-radius:10px;padding:14px 16px;margin-bottom:14px;font-size:13px;color:#6e0811;line-height:1.5;">
+  <strong>Could not load Microsoft sign-in library.</strong><br>
+  Make sure you have an internet connection, then reload the page. This app requires access to <code>unpkg.com</code> or <code>cdn.jsdelivr.net</code>.
+</div>
 <div class="app">
 
   <!-- Header -->
@@ -481,11 +509,20 @@ function stopStream() {
 }
 
 // ── Setup ──────────────────────────────────────────────
+function getMsalLib() {
+  // MSAL v2 exposes `msal`, v3 from unpkg exposes `msalBrowser`
+  return (typeof msalBrowser !== 'undefined') ? msalBrowser
+       : (typeof msal !== 'undefined')        ? msal
+       : null;
+}
+
 function handleSaveConfig() {
   const id = document.getElementById('client-id-input').value.trim();
   if (!id || id.length < 10) { alert('Please enter a valid Azure App Client ID.'); return; }
+  const lib = getMsalLib();
+  if (!lib) { alert('Microsoft sign-in library has not loaded yet. Please check your internet connection and reload.'); return; }
   try {
-    msalInstance = new msal.PublicClientApplication({
+    msalInstance = new lib.PublicClientApplication({
       auth: {
         clientId: id,
         authority: 'https://login.microsoftonline.com/common',
